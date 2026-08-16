@@ -1,0 +1,868 @@
+version: 2
+registry_id: trendai-ai-sources
+
+scope:
+  domain: ai_trends
+  focus: ai_research_product_engineering_and_community_signals
+  primary_geography: global
+  notes:
+    - Initial seed set for AI trend ingestion.
+    - Sources are canonicalized at the source level, not the individual document URL level.
+
+policies:
+  source_selection:
+    strategy: official_first
+    description: >
+      Prefer publisher-owned APIs, feeds, and websites as the primary source of truth.
+      Mirrors and aggregators may be used only for discovery or fallback.
+  reliability_tiers:
+    A: official publisher-owned source or official API
+    B: reputable derived community or signal source
+    C: mirror or aggregator used only as fallback or discovery aid
+  access_method_precedence:
+    - api
+    - rss_or_atom
+    - sitemap_or_index_page
+    - html_index_page
+    - article_page_scrape
+  dedupe:
+    canonical_key_order:
+      - canonical_url
+      - external_id
+      - normalized_title_plus_published_at
+    rules:
+      - Document URLs must map to the parent source entry instead of creating new source entries.
+      - Official sources always outrank mirrors for the same content.
+      - Mirrors must not become the canonical publisher for a document.
+  arxiv_defaults:
+    filter_mode: category_query
+    base_categories:
+      - cs.AI
+      - cs.LG
+      - cs.CL
+      - cs.CV
+      - cs.RO
+      - stat.ML
+    optional_expansion_categories:
+      - cs.MA
+    optional_keyword_fields:
+      - ti
+      - abs
+    sort_by: submittedDate
+    sort_order: descending
+    paging:
+      max_results_per_call: 2000
+      recommended_query_slice_size: 100
+    caching:
+      cache_identical_query_for: 24h
+    polite_client_rules:
+      min_delay_between_calls: 3s
+
+source_schema:
+  required_fields:
+    - id
+    - name
+    - source_class
+    - owner
+    - homepage_url
+    - access
+    - schedule
+    - reliability
+    - content
+    - filtering
+    - dedupe
+    - relationships
+    - notes
+  enums:
+    source_class:
+      - company_blog
+      - research_blog
+      - community_news
+      - paper_feed
+      - mirror_aggregator
+    access_kind:
+      - api
+      - rss_or_atom
+      - sitemap_or_index_page
+      - html_index_page
+      - article_page_scrape
+    reliability_tier:
+      - A
+      - B
+      - C
+    filter_mode:
+      - source_wide
+      - keyword_match
+      - keyword_or_downstream_classifier
+      - category_query
+
+sources:
+  - id: hacker-news
+    name: Hacker News
+    source_class: community_news
+    owner: Y Combinator
+    homepage_url: https://news.ycombinator.com/news
+    access:
+      kind: api
+      primary_url: https://hacker-news.firebaseio.com/v0/
+      discovery_urls:
+        - https://github.com/HackerNews/API
+      fallback_urls:
+        - https://hn.algolia.com/api
+      request_defaults: {}
+    schedule:
+      cadence: near_real_time
+    reliability:
+      tier: B
+      license_tos_notes: Use official public API when possible; treat as a community signal source.
+    content:
+      entity_type: story
+      item_fields:
+        - id
+        - title
+        - url
+        - by
+        - time
+        - score
+        - descendants
+        - text
+      tags:
+        - ai
+        - machine_learning
+        - llms
+        - agents
+        - ai_coding
+        - research
+    filtering:
+      mode: keyword_or_downstream_classifier
+      seed_values:
+        - ai
+        - artificial intelligence
+        - llm
+        - language model
+        - model
+        - machine learning
+        - ml
+        - agent
+        - coding
+        - benchmark
+        - inference
+        - openai
+        - anthropic
+        - deepmind
+        - gemini
+      query_defaults: {}
+    dedupe:
+      primary_keys:
+        - id
+        - url
+      canonical_preference: official_source
+    relationships:
+      fallback_source_ids: []
+    notes:
+      - Use the official API for item retrieval.
+      - Use fallback URLs only for search, discovery, or backfill.
+
+  - id: anthropic-engineering
+    name: Anthropic Engineering
+    source_class: company_blog
+    owner: Anthropic
+    homepage_url: https://www.anthropic.com/engineering
+    access:
+      kind: sitemap_or_index_page
+      primary_url: https://www.anthropic.com/engineering
+      discovery_urls: []
+      fallback_urls: []
+      request_defaults: {}
+    schedule:
+      cadence: daily
+    reliability:
+      tier: A
+      license_tos_notes: Official publisher-owned source.
+    content:
+      entity_type: article
+      item_fields:
+        - title
+        - url
+        - published_at
+        - summary
+        - body_html
+      tags:
+        - ai_engineering
+        - infrastructure
+        - safety
+        - evaluation
+        - product
+    filtering:
+      mode: source_wide
+      seed_values: []
+      query_defaults: {}
+    dedupe:
+      primary_keys:
+        - canonical_url
+        - normalized_title_plus_published_at
+      canonical_preference: official_source
+    relationships:
+      fallback_source_ids: []
+    notes:
+      - Entire source is in scope.
+
+  - id: anthropic-research
+    name: Anthropic Research
+    source_class: research_blog
+    owner: Anthropic
+    homepage_url: https://www.anthropic.com/research
+    access:
+      kind: sitemap_or_index_page
+      primary_url: https://www.anthropic.com/research
+      discovery_urls: []
+      fallback_urls: []
+      request_defaults: {}
+    schedule:
+      cadence: daily
+    reliability:
+      tier: A
+      license_tos_notes: Official publisher-owned source.
+    content:
+      entity_type: article
+      item_fields:
+        - title
+        - url
+        - published_at
+        - summary
+        - body_html
+      tags:
+        - ai_research
+        - interpretability
+        - alignment
+        - safety
+        - evaluations
+    filtering:
+      mode: source_wide
+      seed_values: []
+      query_defaults: {}
+    dedupe:
+      primary_keys:
+        - canonical_url
+        - normalized_title_plus_published_at
+      canonical_preference: official_source
+    relationships:
+      fallback_source_ids: []
+    notes:
+      - Entire source is in scope.
+
+  - id: claude-blog
+    name: Claude Blog
+    source_class: company_blog
+    owner: Anthropic
+    homepage_url: https://claude.com/blog
+    access:
+      kind: sitemap_or_index_page
+      primary_url: https://claude.com/blog
+      discovery_urls: []
+      fallback_urls: []
+      request_defaults: {}
+    schedule:
+      cadence: daily
+    reliability:
+      tier: A
+      license_tos_notes: Official publisher-owned source.
+    content:
+      entity_type: article
+      item_fields:
+        - title
+        - url
+        - published_at
+        - summary
+        - body_html
+      tags:
+        - ai_products
+        - model_releases
+        - ai_coding
+        - enterprise_ai
+    filtering:
+      mode: source_wide
+      seed_values: []
+      query_defaults: {}
+    dedupe:
+      primary_keys:
+        - canonical_url
+        - normalized_title_plus_published_at
+      canonical_preference: official_source
+    relationships:
+      fallback_source_ids: []
+    notes:
+      - Document URLs under the blog map to this source.
+
+  - id: openai-engineering-news
+    name: OpenAI Engineering News
+    source_class: company_blog
+    owner: OpenAI
+    homepage_url: https://openai.com/news/engineering/
+    access:
+      kind: sitemap_or_index_page
+      primary_url: https://openai.com/news/engineering/
+      discovery_urls: []
+      fallback_urls: []
+      request_defaults: {}
+    schedule:
+      cadence: daily
+    reliability:
+      tier: A
+      license_tos_notes: Official publisher-owned source.
+    content:
+      entity_type: article
+      item_fields:
+        - title
+        - url
+        - published_at
+        - summary
+        - body_html
+      tags:
+        - ai_engineering
+        - inference
+        - infrastructure
+        - model_systems
+        - safety
+    filtering:
+      mode: source_wide
+      seed_values: []
+      query_defaults: {}
+    dedupe:
+      primary_keys:
+        - canonical_url
+        - normalized_title_plus_published_at
+      canonical_preference: official_source
+    relationships:
+      fallback_source_ids:
+        - openai-blogboard-mirror
+    notes:
+      - Prefer the official source over mirrors.
+
+  - id: openai-developers-blog
+    name: OpenAI Developers Blog
+    source_class: company_blog
+    owner: OpenAI
+    homepage_url: https://developers.openai.com/blog
+    access:
+      kind: sitemap_or_index_page
+      primary_url: https://developers.openai.com/blog
+      discovery_urls: []
+      fallback_urls: []
+      request_defaults: {}
+    schedule:
+      cadence: daily
+    reliability:
+      tier: A
+      license_tos_notes: Official publisher-owned source.
+    content:
+      entity_type: article
+      item_fields:
+        - title
+        - url
+        - published_at
+        - summary
+        - body_html
+      tags:
+        - api
+        - agents
+        - tooling
+        - ai_coding
+        - developer_workflows
+    filtering:
+      mode: source_wide
+      seed_values: []
+      query_defaults: {}
+    dedupe:
+      primary_keys:
+        - canonical_url
+        - normalized_title_plus_published_at
+      canonical_preference: official_source
+    relationships:
+      fallback_source_ids:
+        - openai-blogboard-mirror
+    notes:
+      - Prefer the official source over mirrors.
+
+  - id: openai-blogboard-mirror
+    name: Blogboard OpenAI Blog Mirror
+    source_class: mirror_aggregator
+    owner: Blogboard
+    homepage_url: https://blogboard.io/source-feed/source/openai-blog
+    access:
+      kind: sitemap_or_index_page
+      primary_url: https://blogboard.io/source-feed/source/openai-blog
+      discovery_urls: []
+      fallback_urls: []
+      request_defaults: {}
+    schedule:
+      cadence: daily
+    reliability:
+      tier: C
+      license_tos_notes: Third-party mirror. Use for discovery or temporary fallback only.
+    content:
+      entity_type: article
+      item_fields:
+        - title
+        - url
+        - published_at
+        - summary
+      tags:
+        - openai_related_posts
+    filtering:
+      mode: source_wide
+      seed_values: []
+      query_defaults: {}
+    dedupe:
+      primary_keys:
+        - upstream_url
+        - normalized_title_plus_published_at
+      canonical_preference: upstream_official_source
+    relationships:
+      fallback_source_ids: []
+    notes:
+      - Never treat this mirror as the canonical publisher when an official source is available.
+
+  - id: google-research-blog
+    name: Google Research Blog
+    source_class: research_blog
+    owner: Google Research
+    homepage_url: https://research.google/blog/
+    access:
+      kind: sitemap_or_index_page
+      primary_url: https://research.google/blog/
+      discovery_urls: []
+      fallback_urls: []
+      request_defaults: {}
+    schedule:
+      cadence: daily
+    reliability:
+      tier: A
+      license_tos_notes: Official publisher-owned source.
+    content:
+      entity_type: article
+      item_fields:
+        - title
+        - url
+        - published_at
+        - summary
+        - body_html
+      tags:
+        - ai_research
+        - machine_learning
+        - multimodal
+        - safety
+        - evaluation
+    filtering:
+      mode: keyword_or_downstream_classifier
+      seed_values:
+        - ai
+        - artificial intelligence
+        - machine learning
+        - llm
+        - model
+        - benchmark
+        - vision
+        - multimodal
+        - unlearning
+        - evaluation
+      query_defaults: {}
+    dedupe:
+      primary_keys:
+        - canonical_url
+        - normalized_title_plus_published_at
+      canonical_preference: official_source
+    relationships:
+      fallback_source_ids: []
+    notes:
+      - Only AI-relevant posts should be retained.
+
+  - id: google-deepmind-blog
+    name: Google DeepMind Blog
+    source_class: research_blog
+    owner: Google DeepMind
+    homepage_url: https://deepmind.google/blog/
+    access:
+      kind: sitemap_or_index_page
+      primary_url: https://deepmind.google/blog/
+      discovery_urls: []
+      fallback_urls: []
+      request_defaults: {}
+    schedule:
+      cadence: daily
+    reliability:
+      tier: A
+      license_tos_notes: Official publisher-owned source.
+    content:
+      entity_type: article
+      item_fields:
+        - title
+        - url
+        - published_at
+        - summary
+        - body_html
+      tags:
+        - frontier_models
+        - reinforcement_learning
+        - agents
+        - science
+        - safety
+    filtering:
+      mode: source_wide
+      seed_values: []
+      query_defaults: {}
+    dedupe:
+      primary_keys:
+        - canonical_url
+        - normalized_title_plus_published_at
+      canonical_preference: official_source
+    relationships:
+      fallback_source_ids: []
+    notes:
+      - Entire source is in scope.
+
+  - id: meta-ai-blog
+    name: Meta AI Blog
+    source_class: research_blog
+    owner: Meta
+    homepage_url: https://ai.meta.com/blog
+    access:
+      kind: sitemap_or_index_page
+      primary_url: https://ai.meta.com/blog
+      discovery_urls: []
+      fallback_urls: []
+      request_defaults: {}
+    schedule:
+      cadence: daily
+    reliability:
+      tier: A
+      license_tos_notes: Official publisher-owned source.
+    content:
+      entity_type: article
+      item_fields:
+        - title
+        - url
+        - published_at
+        - summary
+        - body_html
+      tags:
+        - ai_research
+        - ai_infrastructure
+        - computer_vision
+        - open_models
+        - safety
+    filtering:
+      mode: source_wide
+      seed_values: []
+      query_defaults: {}
+    dedupe:
+      primary_keys:
+        - canonical_url
+        - normalized_title_plus_published_at
+      canonical_preference: official_source
+    relationships:
+      fallback_source_ids: []
+    notes:
+      - Entire source is in scope.
+
+  - id: mistral-news
+    name: Mistral News
+    source_class: company_blog
+    owner: Mistral AI
+    homepage_url: https://mistral.ai/news/
+    access:
+      kind: sitemap_or_index_page
+      primary_url: https://mistral.ai/news/
+      discovery_urls: []
+      fallback_urls: []
+      request_defaults: {}
+    schedule:
+      cadence: daily
+    reliability:
+      tier: A
+      license_tos_notes: Official publisher-owned source.
+    content:
+      entity_type: article
+      item_fields:
+        - title
+        - url
+        - published_at
+        - summary
+        - body_html
+      tags:
+        - model_releases
+        - ai_research
+        - ai_engineering
+        - ai_products
+        - agents
+    filtering:
+      mode: source_wide
+      seed_values: []
+      query_defaults: {}
+    dedupe:
+      primary_keys:
+        - canonical_url
+        - normalized_title_plus_published_at
+      canonical_preference: official_source
+    relationships:
+      fallback_source_ids: []
+    notes:
+      - Entire source is in scope.
+
+  - id: cohere-blog
+    name: Cohere Blog
+    source_class: company_blog
+    owner: Cohere
+    homepage_url: https://cohere.com/blog
+    access:
+      kind: sitemap_or_index_page
+      primary_url: https://cohere.com/blog
+      discovery_urls: []
+      fallback_urls: []
+      request_defaults: {}
+    schedule:
+      cadence: daily
+    reliability:
+      tier: A
+      license_tos_notes: Official publisher-owned source.
+    content:
+      entity_type: article
+      item_fields:
+        - title
+        - url
+        - published_at
+        - summary
+        - body_html
+      tags:
+        - enterprise_ai
+        - model_releases
+        - ai_for_developers
+        - ai_research
+        - inference
+    filtering:
+      mode: source_wide
+      seed_values: []
+      query_defaults: {}
+    dedupe:
+      primary_keys:
+        - canonical_url
+        - normalized_title_plus_published_at
+      canonical_preference: official_source
+    relationships:
+      fallback_source_ids: []
+    notes:
+      - Entire source is in scope.
+
+  - id: microsoft-research-blog
+    name: Microsoft Research Blog
+    source_class: research_blog
+    owner: Microsoft Research
+    homepage_url: https://www.microsoft.com/en-us/research/blog/
+    access:
+      kind: sitemap_or_index_page
+      primary_url: https://www.microsoft.com/en-us/research/blog/
+      discovery_urls: []
+      fallback_urls: []
+      request_defaults: {}
+    schedule:
+      cadence: daily
+    reliability:
+      tier: A
+      license_tos_notes: Official publisher-owned source.
+    content:
+      entity_type: article
+      item_fields:
+        - title
+        - url
+        - published_at
+        - summary
+        - body_html
+      tags:
+        - ai_research
+        - agents
+        - evaluations
+        - multimodal
+        - small_models
+    filtering:
+      mode: keyword_or_downstream_classifier
+      seed_values:
+        - ai
+        - artificial intelligence
+        - agent
+        - llm
+        - multimodal
+        - reinforcement learning
+        - evaluation
+        - safety
+        - small language model
+      query_defaults: {}
+    dedupe:
+      primary_keys:
+        - canonical_url
+        - normalized_title_plus_published_at
+      canonical_preference: official_source
+    relationships:
+      fallback_source_ids: []
+    notes:
+      - Retain only AI-relevant posts if the broader research index includes non-AI material.
+
+  - id: nvidia-blog
+    name: NVIDIA Blog
+    source_class: company_blog
+    owner: NVIDIA
+    homepage_url: https://blogs.nvidia.com/
+    access:
+      kind: sitemap_or_index_page
+      primary_url: https://blogs.nvidia.com/
+      discovery_urls: []
+      fallback_urls: []
+      request_defaults: {}
+    schedule:
+      cadence: daily
+    reliability:
+      tier: A
+      license_tos_notes: Official publisher-owned source.
+    content:
+      entity_type: article
+      item_fields:
+        - title
+        - url
+        - published_at
+        - summary
+        - body_html
+      tags:
+        - ai_infrastructure
+        - inference
+        - robotics
+        - chips
+        - deployment
+    filtering:
+      mode: keyword_or_downstream_classifier
+      seed_values:
+        - ai
+        - artificial intelligence
+        - inference
+        - foundation model
+        - llm
+        - agent
+        - robotics
+        - gpu
+        - datacenter
+        - model
+      query_defaults: {}
+    dedupe:
+      primary_keys:
+        - canonical_url
+        - normalized_title_plus_published_at
+      canonical_preference: official_source
+    relationships:
+      fallback_source_ids: []
+    notes:
+      - Retain only AI-relevant posts from the broader company blog.
+
+  - id: huggingface-papers-trending
+    name: Hugging Face Papers Trending
+    source_class: paper_feed
+    owner: Hugging Face
+    homepage_url: https://huggingface.co/papers/trending
+    access:
+      kind: html_index_page
+      primary_url: https://huggingface.co/papers/trending
+      discovery_urls: []
+      fallback_urls: []
+      request_defaults: {}
+    schedule:
+      cadence: daily
+    reliability:
+      tier: B
+      license_tos_notes: Derived popularity signal. Do not treat as canonical paper metadata authority.
+    content:
+      entity_type: paper
+      item_fields:
+        - title
+        - url
+        - source_paper_url
+        - authors
+        - abstract
+        - trend_rank
+      tags:
+        - ai_research
+        - paper_popularity
+        - paper_discovery
+    filtering:
+      mode: source_wide
+      seed_values: []
+      query_defaults: {}
+    dedupe:
+      primary_keys:
+        - source_paper_url
+        - normalized_title_plus_published_at
+      canonical_preference: upstream_paper_source
+    relationships:
+      fallback_source_ids:
+        - arxiv-ai
+    notes:
+      - Use as a popularity or discovery signal only.
+
+  - id: arxiv-ai
+    name: arXiv AI Feed
+    source_class: paper_feed
+    owner: arXiv
+    homepage_url: https://arxiv.org/
+    access:
+      kind: api
+      primary_url: http://export.arxiv.org/api/query
+      discovery_urls: []
+      fallback_urls: []
+      request_defaults:
+        search_query: "(cat:cs.AI OR cat:cs.LG OR cat:cs.CL OR cat:cs.CV OR cat:cs.RO OR cat:stat.ML)"
+        sortBy: submittedDate
+        sortOrder: descending
+    schedule:
+      cadence: daily
+    reliability:
+      tier: A
+      license_tos_notes: Official arXiv API. Follow API terms and polite client guidance.
+    content:
+      entity_type: paper
+      item_fields:
+        - arxiv_id
+        - title
+        - authors
+        - summary
+        - published
+        - updated
+        - primary_category
+        - categories
+        - pdf_url
+        - abs_url
+      tags:
+        - ai_research
+        - machine_learning
+        - natural_language_processing
+        - computer_vision
+        - robotics
+    filtering:
+      mode: category_query
+      seed_values:
+        - cs.AI
+        - cs.LG
+        - cs.CL
+        - cs.CV
+        - cs.RO
+        - stat.ML
+      query_defaults:
+        optional_expansion_categories:
+          - cs.MA
+        optional_keyword_fields:
+          - ti
+          - abs
+    dedupe:
+      primary_keys:
+        - arxiv_id
+      canonical_preference: official_source
+    relationships:
+      fallback_source_ids: []
+    notes:
+      - Category-led filtering is the primary AI relevance strategy.
+      - Store the full categories list for downstream classification.

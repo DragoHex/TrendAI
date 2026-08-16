@@ -1,8 +1,8 @@
-# AI Model for Aggregating National Startup Trends — Project Plan
+# AI Model for Aggregating AI Trends — Project Plan
 
 ## 1. Overview
 
-**Goal:** Build an autonomous agent system that fetches national startup-ecosystem data from reliable sources, processes/summarizes it using a local small language model (SLM, e.g. Gemma 4B-class), and renders a polished, template-based report (data + charts + illustrations) — orchestrated via Google ADK with full observability/tracing.
+**Goal:** Build an autonomous agent system that fetches AI-trend data from reliable sources, processes/summarizes it using a local small language model (SLM, e.g. Gemma 4B-class), and renders a polished, template-based report (data + charts + illustrations) — orchestrated via Google ADK with full observability/tracing.
 
 **Core constraints driving the design:**
 - SLM has small context window → data pipeline must chunk, pre-aggregate, and route only relevant slices to the model at each step.
@@ -51,16 +51,18 @@
 ### 3.1 Design Phase
 
 **T1. Data source specification**
-- Enumerate reliable national startup-data sources (govt startup registries, national statistics offices, funding databases, news wire APIs, sector reports).
+- Enumerate reliable AI-trend data sources (research labs, engineering blogs, paper feeds, model release notes, community signal sources).
 - For each source define: access method (API/scrape/feed), refresh cadence, reliability tier, licensing/ToS constraints, expected schema.
 - Deliverable: `sources.yaml`/`sources.json` registry with tier + schema per source.
+- The initial registry may retain a small number of free-text metadata fields where useful; when implementing the backend, normalize these into typed fields/enums wherever practical so the registry loads cleanly into Go structs with minimal special-casing.
 
 **T2. Data model definition**
-- Define canonical internal schema all sources normalize into: `{entity, sector, region, funding_round, amount, date, employee_count, source_id, confidence}` etc.
+- Define canonical internal schema all sources normalize into: `{topic, subtopic, organization, artifact_type, title, summary, url, published_at, source_id, confidence}` etc.
 - Define provenance fields (source, fetch timestamp, raw payload hash) for traceability and later auditing.
+- Define the backend-facing schema for the source registry as well, including how free-text fields from T1 such as notes and licensing/ToS notes will later be converted into stricter typed fields, flags, or enums.
 
 **T3. Report template taxonomy**
-- Decide fixed set of N report templates (e.g.: "Sector Deep-Dive", "Regional Snapshot", "Funding Trend Timeline", "Ecosystem Health Overview", "Comparative Quarter-over-Quarter").
+- Decide fixed set of N report templates (e.g.: "Research Trend Timeline", "Model Release Radar", "AI Tooling Landscape", "Ecosystem Overview", "Comparative Month-over-Month").
 - For each template define: required data fields, chart types needed (bar/line/heatmap/map), illustration slots, narrative-block slots, min/max data volume it supports.
 - Deliverable: `templates/registry.yaml` describing selection criteria (rules the Template Selector will use — e.g. "if data spans ≥3 regions → Regional Snapshot eligible").
 
@@ -93,6 +95,7 @@
 - Implement one fetch tool per source tier, each normalizing to canonical schema (T2) before returning.
 - Implement source-level caching (avoid re-fetching unchanged data) and a raw-payload staging store with hashes for reproducibility.
 - Unit-testable in isolation with mocked source responses.
+- Backend implementation should consume the normalized source-registry schema from T1/T2 and avoid ad hoc branching on free-text registry fields wherever possible.
 
 **T8. Preprocessing/Chunking Service**
 - Implement chunker per T4 policy: deterministic, reproducible chunk boundaries given same input + config.
@@ -159,10 +162,10 @@
 ### 3.4 Integration Phase
 
 **T20. Scheduler integration**
-- Wire recurring triggers (e.g., weekly national trend digest) into the orchestrator entrypoint; ensure idempotency (re-running for same period doesn't duplicate/corrupt stored reports).
+- Wire recurring triggers (e.g., weekly AI trend digest) into the orchestrator entrypoint; ensure idempotency (re-running for same period doesn't duplicate/corrupt stored reports).
 
 **T21. Storage/versioning integration**
-- Persist report data objects (T11 output) and rendered artifacts (T13 output) with versioning, so historical comparisons (e.g. QoQ templates) can pull prior runs' data objects directly rather than re-deriving.
+- Persist report data objects (T11 output) and rendered artifacts (T13 output) with versioning, so historical comparisons (e.g. month-over-month templates) can pull prior runs' data objects directly rather than re-deriving.
 
 **T22. Observability backend integration**
 - Finalize export pipeline from ADK trace/span emission into chosen OTEL-compatible backend; build the dashboards specified in T6.
@@ -191,7 +194,7 @@
 - Partial-failure simulation: kill one source mid-run, verify graceful degradation and correct annotation in final report.
 
 **T27. Performance/load tests**
-- Measure SLM throughput under realistic chunk volume (national-scale data) on target hardware; validate context-budget policy holds under worst-case chunk sizes.
+- Measure SLM throughput under realistic chunk volume (ecosystem-scale AI data) on target hardware; validate context-budget policy holds under worst-case chunk sizes.
 - Measure end-to-end run latency; identify bottleneck stage (likely SLM inference) and validate batching/concurrency settings (T9).
 
 **T28. Observability validation**
